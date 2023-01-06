@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<!-- 
+	source: https://gist.github.com/tanmaykm/5111225 
+	-->
+	<html>
+	<head>
+		<title>Land Grab Game</title>
+		<style type = "text/css">
+			body {
+				text-align: center;
+			}
+
+			.cell {
+				border: dotted 1px #444444;
+				font: 40px arial,sans-serif;
+			}
+
+			button {
+				height: 50px;
+				font-size: 16px;
+			}
+			#playerColor {
+				margin: 5px auto;
+				background-color: lightsteelblue;
+				width: 100px;
+			}
+		</style>	
+		<script type = "text/javascript">
+			//顯示玩家顏色給使用者
+			function playerColor() {
+				var ms = document.getElementById("player").value;
+				console.log(ms);
+				if(ms == "p1")
+					document.getElementById("playerColor").style.backgroundColor = "LightSteelBlue";
+				else
+					document.getElementById("playerColor").style.backgroundColor = "LightGoldenRodYellow";
+			}
+
+			function log_msg(msg) {
+				console.log(msg);
+			}
+
+			var s; //socket object for connection
+			function doInit() {
+				try {
+					var host = "ws://localhost:4545/"; //設定socker server的ip:port
+					//host = "ws://10.32.21.247:4545/";
+					/*if(window.location.hostname) {
+						host = "ws://" + window.location.hostname + ":4545/";
+					}*/
+
+					s = new WebSocket(host); //建立socket元件
+					//設定幾個主要事件
+					s.onopen = function (e) { log_msg("connected..."); };
+					s.onclose = function (e) { log_msg("connection closed."); };
+					s.onerror = function (e) { log_msg("connection error."); };
+					
+					//當server送訊息來時
+					s.onmessage = function (e) { 
+						log_msg("message: " + e.data);
+						//e.data是Socket server送來的訊息
+						//用, 來切割訊息
+						strs = e.data.split(',');
+						//解讀各段訊息的內容
+						cellID = strs[0]; //格子ID
+						cellDefense = strs[1]; //格子防禦值
+						cellColor = strs[2]; //格子顏色
+						defense(cellID, cellDefense, cellColor); //改格子的符號
+					};
+				} 
+				catch (ex) {
+					log_msg("connection exception:" + ex);
+				}	 
+				
+				//取得class是 "cell" 的元件
+				const cells = document.querySelectorAll(".cell");
+				//逐一設定onclick事件
+				cells.forEach(function(el) {
+					el.onclick = function() {
+						//玩家有不同點按格子的顏色
+						colorP1 = "lightsteelblue";
+						colorP2 = "lightgoldenrodyellow";
+						//抓id和防禦值
+						id = this.id;
+						df = Number(this.innerHTML);
+						bg = document.getElementById(id).style.backgroundColor;
+						console.log(bg);
+						//取得是玩家幾
+						var myselect = document.getElementById("player").value;
+						//玩家一的動作
+						if(myselect == 'p1') {
+							//若格子尚未被選
+							if(df == 0) {
+								//把格子id跟使用的顏色傳給socket server
+								s.send(id + "," + 1 + "," + colorP1);
+							}
+							//格子是自己的顏色且已被選過
+							else if(df>0 && bg==colorP1) {
+								increase = df + 1;
+								s.send(id + "," + increase + "," + colorP1);
+							}
+							//不是自己顏色的話
+							else {
+								decrease = df - 1;
+								if(decrease == 0)
+									s.send(id + "," + decrease + "," + "white");
+								else
+									s.send(id + "," + decrease + "," + colorP2);
+							}
+						}
+						//玩家二的動作
+						else {
+							//若格子尚未被選
+							if(df == 0) {
+								//把格子id跟使用的顏色傳給socket server
+								s.send(id + "," + 1 + "," + colorP2);
+							}
+							//格子是自己的顏色且已被選過
+							else if(df>0 && bg==colorP2) {
+								increase = df + 1;
+								s.send(id + "," + increase + "," + colorP2);
+							}
+							//不是自己顏色的話
+							else {
+								decrease = df - 1;
+								//如果防禦減到1顏色為空白
+								if(decrease == 0)
+									s.send(id + "," + decrease + "," + "white");
+								else
+									s.send(id + "," + decrease + "," + colorP1);
+							}
+						}
+					}
+				});
+			}
+			
+			//設定格子的顏色和防禦值
+			function defense(id, defense, color) {
+				document.getElementById(id).innerHTML = defense;
+				document.getElementById(id).style.backgroundColor = color;
+			}
+
+			//計時30秒
+			function timing() {
+				doInit();
+				var myVar = setInterval(doInit(),30000);
+			}
+		</script>
+	</head>
+	<body>
+		<h1>歡迎來到搶地遊戲!!</h1>
+		<br/>
+		玩家：<select id="player" onchange="playerColor()">
+			<option value="p1">p1</option>
+			<option value="p2">p2</option>
+		</select>
+		<div id="playerColor">這是你的顏色</div>
+		<br/><br/>
+		<button onclick="timing()">30秒計時開始</button>
+		<br/><br/>
+		<div id="seconds"></div>
+		<table border="1" width="500px" height="500px" align="center">
+			<tr><td class='cell' id='00'>0</td><td  class='cell' id='01'>0</td><td  class='cell' id='02'>0</td><td  class='cell' id='03'>0</td><td  class='cell' id='04'>0</td></tr>
+			<tr><td class='cell' id='10'>0</td><td  class='cell' id='11'>0</td><td  class='cell' id='12'>0</td><td  class='cell' id='13'>0</td><td  class='cell' id='14'>0</td></tr>
+			<tr><td class='cell' id='20'>0</td><td  class='cell' id='21'>0</td><td  class='cell' id='22'>0</td><td  class='cell' id='23'>0</td><td  class='cell' id='24'>0</td></tr>
+			<tr><td class='cell' id='30'>0</td><td  class='cell' id='31'>0</td><td  class='cell' id='32'>0</td><td  class='cell' id='33'>0</td><td  class='cell' id='34'>0</td></tr>
+			<tr><td class='cell' id='40'>0</td><td  class='cell' id='41'>0</td><td  class='cell' id='42'>0</td><td  class='cell' id='43'>0</td><td  class='cell' id='44'>0</td></tr>
+		</table>
+	</body>
+</html>
